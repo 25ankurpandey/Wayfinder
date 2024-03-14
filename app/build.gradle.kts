@@ -37,7 +37,11 @@ android {
 
 dependencies {
 
-    implementation ("com.google.android.gms:play-services-maps:17.0.1")
+    implementation ("com.android.volley:volley:1.2.1")
+    implementation ("com.google.android.libraries.places:places:3.3.0")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation ("com.google.android.gms:play-services-location:21.2.0")
+    implementation ("com.google.android.gms:play-services-maps:18.2.0")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
