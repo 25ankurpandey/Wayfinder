@@ -8,16 +8,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
-    <EditText
-        android:id="@+id/search_edit_text"
+    <FrameLayout
+        android:id="@+id/search_autocomplete_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:hint="Search location"
         android:drawableLeft="@drawable/ic_search"
-        android:padding="12dp"
         android:background="@drawable/rounded_edittext"
-        android:drawablePadding="12dp"/>
+        android:layout_marginTop="16dp"/>
 
     <Button
         android:id="@+id/my_location_button"

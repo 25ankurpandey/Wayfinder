@@ -3,6 +3,7 @@ package com.wayfinder.wayfinder
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +11,7 @@ import android.widget.Button
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.common.api.Status
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
@@ -17,6 +19,9 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.wayfinder.wayfinderar.LocationService
 import kotlinx.coroutines.launch
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
@@ -37,8 +42,32 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         mapFragment?.getMapAsync(this)
         locationService = LocationService(requireContext())
 
-        // Setup the custom My Location button
         setupMyLocationButton(view)
+        setupAutocompleteFragment()
+    }
+
+    private fun setupAutocompleteFragment() {
+        val autocompleteFragment = AutocompleteSupportFragment.newInstance().apply {
+            setPlaceFields(listOf(Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG))
+            setHint("Search location")
+//            setCountries("US") // Optional: set country filter
+        }
+
+        childFragmentManager.beginTransaction()
+            .replace(R.id.search_autocomplete_container, autocompleteFragment)
+            .commit()
+
+        autocompleteFragment.setOnPlaceSelectedListener(object : PlaceSelectionListener {
+            override fun onPlaceSelected(place: Place) {
+                place.latLng?.let {
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
+                }
+            }
+
+            override fun onError(status: Status) {
+                Log.i("Autocomplete", "An error occurred: $status")
+            }
+        })
     }
 
     private fun setupMyLocationButton(view: View) {
@@ -57,11 +86,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun fetchLocationAndDisplay() {
         lifecycleScope.launch {
-            val lastLocation = locationService.getLastLocation()
+            val lastLocation = locationService.getLastLocation() // Ensure this method is coroutine-friendly
             lastLocation?.let {
                 val currentLatLng = LatLng(it.latitude, it.longitude)
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
-            }
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
+            } ?: Log.d("MapFragment", "Last location is null")
         }
     }
 
@@ -70,8 +99,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             mMap.isMyLocationEnabled = true
-            // Hide the default My Location button
             mMap.uiSettings.isMyLocationButtonEnabled = false
+            fetchLocationAndDisplay() // Call here to ensure location is set when map is ready
         }
     }
+
 }
