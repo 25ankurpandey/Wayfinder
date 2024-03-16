@@ -15,7 +15,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val apiKey = getMetaDataValue("com.google.android.geo.API_KEY")
+        val apiKey = Constants.GOOGLE_MAPS_API_KEY
         if (!Places.isInitialized()) {
             Places.initialize(applicationContext, apiKey)
         }
@@ -51,13 +51,5 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getMetaDataValue(name: String): String? {
-        try {
-            val applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-            return applicationInfo.metaData?.getString(name)
-        } catch (e: PackageManager.NameNotFoundException) {
-            e.printStackTrace()
-        }
-        return null
-    }
+
 }

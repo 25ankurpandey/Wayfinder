@@ -9,21 +9,94 @@
         android:layout_height="match_parent"/>
 
     <FrameLayout
-        android:id="@+id/search_autocomplete_container"
+        android:id="@+id/autocomplete_fragment_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:drawableLeft="@drawable/ic_search"
-        android:background="@drawable/rounded_edittext"
-        android:layout_marginTop="16dp"/>
+        android:elevation="4dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/rounded_background"
+        android:padding="4dp">
+        <fragment
+            android:id="@+id/autocomplete_fragment"
+            android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </FrameLayout>
 
-    <Button
+    <ImageButton
         android:id="@+id/my_location_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:elevation="4dp"
         android:layout_marginEnd="18dp"
-        android:layout_marginBottom="18dp"
-        android:text="My Location"
+        android:layout_marginBottom="60dp"
+        android:background="@drawable/circle_button"
+        android:src="@drawable/ic_current_location"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"/>
+        android:layout_alignParentEnd="true"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/directions_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:elevation="4dp"
+        android:background="@drawable/circle_button"
+        android:src="@drawable/ic_directions"
+        android:layout_above="@id/my_location_button"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/walking_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:elevation="4dp"
+        android:background="@drawable/navigation_mode_circle_button"
+        android:src="@drawable/ic_walk"
+        android:layout_marginEnd="28dp"
+        android:layout_marginBottom="16dp"
+        android:layout_above="@id/directions_button"
+        android:layout_toStartOf="@id/directions_button"
+        android:layout_alignParentEnd="true"
+        android:visibility="gone"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/driving_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:elevation="4dp"
+        android:background="@drawable/navigation_mode_circle_button"
+        android:src="@drawable/ic_drive"
+        android:layout_toStartOf="@id/directions_button"
+        android:layout_alignTop="@id/directions_button"
+        android:layout_marginEnd="18dp"
+        android:visibility="gone"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/start_navigation_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:elevation="4dp"
+        android:background="@drawable/circle_button"
+        android:src="@drawable/ic_start_navigation"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="30dp"
+        android:visibility="gone"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
 
 </RelativeLayout>
