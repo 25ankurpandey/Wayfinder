@@ -4,7 +4,7 @@
     android:layout_height="wrap_content"
     android:background="@drawable/route_info_box_normal"
     android:elevation="6dp"
-    android:padding="8dp">
+    android:padding="10dp">
 
         <TextView
         android:id="@+id/route_info"

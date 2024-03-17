@@ -25,6 +25,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.gms.maps.model.Polyline
@@ -56,6 +57,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var navigatePhoneButton: ImageButton
     private var polylineToRouteMap: MutableMap<Polyline, Route> = mutableMapOf()
     private var selectedPolyline: Polyline? = null
+    private var routeInfoMarkerToRouteMap: MutableMap<Marker, Route> = mutableMapOf()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         // Inflate the layout for this fragment
@@ -151,9 +153,21 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             mMap.uiSettings.isMyLocationButtonEnabled = false
             fetchLocationAndDisplay()
         }
+        mMap.setOnMarkerClickListener { marker ->
+            routeInfoMarkerToRouteMap[marker]?.let { route ->
+                selectRoute(route)
+            }
+            true
+        }
+
         mMap.setOnPolylineClickListener { polyline ->
             selectPolyline(polyline)
         }
+    }
+
+    private fun selectRoute(route: Route) {
+        val polyline = polylineToRouteMap.entries.find { it.value == route }?.key
+        polyline?.let { selectPolyline(it) }
     }
 
     private fun moveToCurrentLocation() {
@@ -226,8 +240,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                 result?.routes?.forEachIndexed { index, route ->
                     val (totalDistance, totalTime) = calculateTotalDistanceAndTime(route)
                     Log.d("RouteInfo", "Route $index: Distance = $totalDistance, Time = $totalTime")
-                    val midpoint = calculateMidpoint(route)
-                    showRouteInfoMarker(midpoint, totalDistance, totalTime)
+                    showRouteInfoMarker(totalDistance, totalTime, route, isFirstRoute)
 
                     val shadowPolylineOptions = PolylineOptions()
                         .addAll(PolyUtil.decode(route.overview_polyline.points))
@@ -293,10 +306,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         return decodedPath[decodedPath.size / 2] // Get the midpoint for simplicity
     }
 
-    private fun generateCustomMarkerView(distance: String, duration: String): Bitmap {
+    private fun generateCustomMarkerView(distance: String, duration: String, isSelected: Boolean): Bitmap {
         val view = LayoutInflater.from(context).inflate(R.layout.layout_route_info_window, null)
         val routeInfoTextView = view.findViewById<TextView>(R.id.route_info)
-        routeInfoTextView.text = distance + ", " + duration
+        routeInfoTextView.text = "$distance, $duration"
+        if (isSelected) {
+            view.setBackgroundResource(R.drawable.route_info_box_selected)
+        }
 
         view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)
@@ -308,34 +324,59 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         return bitmap
     }
 
-    private fun showRouteInfoMarker(location: LatLng, distance: String, duration: String) {
-        val icon = BitmapDescriptorFactory.fromBitmap(generateCustomMarkerView(distance, duration))
-        val markerOptions = MarkerOptions()
-            .position(location)
-            .icon(icon)
-
-        mMap.addMarker(markerOptions)
-    }
-
-    private fun selectPolyline(selectedPolyline: Polyline) {
-        this.selectedPolyline?.color = ContextCompat.getColor(requireContext(), R.color.unselectedPolylineColor)
-        this.selectedPolyline?.width = UNSELECTED_POLYLINE_WIDTH
-
-        selectedPolyline.color = ContextCompat.getColor(requireContext(), R.color.selectedPolylineColor)
-        selectedPolyline.width = SELECTED_POLYLINE_WIDTH
-        selectedPolyline.zIndex = 1f // Ensure the selected path appears on top
-
-        // Reset the zIndex for previously selected polyline
-        this.selectedPolyline?.zIndex = 0f
-
-        // Update the reference to the currently selected polyline
-        this.selectedPolyline = selectedPolyline
-
-        // Log the selected route
-        polylineToRouteMap[selectedPolyline]?.let { selectedRoute ->
-            Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
+    private fun showRouteInfoMarker(distance: String, duration: String, route: Route, isSelected: Boolean) {
+        val icon = BitmapDescriptorFactory.fromBitmap(generateCustomMarkerView(distance, duration, isSelected))
+        val location = calculateMidpoint(route)
+        val markerOptions = MarkerOptions().position(location).icon(icon)
+        val marker: Marker? = mMap.addMarker(markerOptions)
+        marker?.let {
+            routeInfoMarkerToRouteMap[it] = route
         }
     }
+
+
+    private fun selectPolyline(polyline: Polyline) {
+        // Deselect all polylines and markers first
+        for ((poly, _) in polylineToRouteMap) {
+            poly.color = ContextCompat.getColor(requireContext(), R.color.unselectedPolylineColor)
+            poly.width = UNSELECTED_POLYLINE_WIDTH
+            poly.zIndex = 0f
+        }
+        // Reset marker icons to unselected state
+        for ((marker, _) in routeInfoMarkerToRouteMap) {
+            val route = routeInfoMarkerToRouteMap[marker]
+            val iconBitmap = generateCustomMarkerView(
+                calculateTotalDistanceAndTime(route!!).first,
+                calculateTotalDistanceAndTime(route).second,
+                isSelected = false
+            )
+            marker.setIcon(BitmapDescriptorFactory.fromBitmap(iconBitmap))
+        }
+
+        // Select the current polyline
+        polyline.color = ContextCompat.getColor(requireContext(), R.color.selectedPolylineColor)
+        polyline.width = SELECTED_POLYLINE_WIDTH
+        polyline.zIndex = 1f
+
+        // Find and update the marker icon for the selected route
+        val selectedRoute = polylineToRouteMap[polyline]
+        val selectedMarker = routeInfoMarkerToRouteMap.entries.find { it.value == selectedRoute }?.key
+        selectedMarker?.let { marker ->
+            val iconBitmap = generateCustomMarkerView(
+                calculateTotalDistanceAndTime(selectedRoute!!).first,
+                calculateTotalDistanceAndTime(selectedRoute).second,
+                isSelected = true
+            )
+            marker.setIcon(BitmapDescriptorFactory.fromBitmap(iconBitmap))
+        }
+
+        // Keep track of the selected polyline
+        selectedPolyline = polyline
+
+        // Log the selected route for debugging
+        Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
+    }
+
     private suspend fun adjustCameraToRouteAndShowButton(routePoints: List<LatLng>) {
         val deferredCompletion = CompletableDeferred<Unit>()
 
