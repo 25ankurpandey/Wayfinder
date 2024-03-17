@@ -2,6 +2,6 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="#FFFFFF" />
     <corners android:radius="8dp"/>
-    <stroke android:width="0.2dp" android:color="#FF000000"/>
+    <stroke android:width="0.dp" android:color="#FF000000"/>
     <padding android:left="8dp" android:top="8dp" android:right="8dp" android:bottom="8dp"/> <!-- Padding inside the drawable -->
 </shape>
