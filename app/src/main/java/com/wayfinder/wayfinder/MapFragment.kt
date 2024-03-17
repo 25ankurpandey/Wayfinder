@@ -100,7 +100,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         startNavigationButton.setOnClickListener { startNavigation() }
         startServerButton.setOnClickListener { startNavigation() }
         navigatePhoneButton.setOnClickListener { startPhoneNavigation() }
-        startServerButton.setOnClickListener { startDeviceDiscovery() }
+        startServerButton.setOnClickListener { showDeviceDiscovery() }
 
         myLocationButton.visibility = View.VISIBLE
         directionsButton.visibility = View.GONE
@@ -111,12 +111,23 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         navigatePhoneButton.visibility = View.GONE
     }
 
-    private fun startDeviceDiscovery() {
-        TODO("Not yet implemented")
+    private fun showDeviceDiscovery() {
+        val deviceDiscoveryDialog = DeviceDiscoveryDialog { deviceInfo ->
+            Toast.makeText(context, "Device clicked: ${deviceInfo.deviceName}", Toast.LENGTH_SHORT).show()
+        }
+        deviceDiscoveryDialog.show(childFragmentManager, deviceDiscoveryDialog.tag)
+
+        // Start UDP Discovery
+        UdpDiscovery { deviceInfo ->
+            activity?.runOnUiThread {
+                deviceDiscoveryDialog.addDevice(deviceInfo)
+            }
+        }.startDiscovery()
     }
 
+
     private fun startPhoneNavigation() {
-        TODO("Not yet implemented")
+        Toast.makeText(context, "Yet to implement.", Toast.LENGTH_SHORT).show()
     }
 
     private fun toggleRouteOptionsVisibility() {
