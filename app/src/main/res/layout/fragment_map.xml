@@ -94,7 +94,35 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="30dp"
-        android:visibility="gone"
+        android:visibility="visible"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/start_server_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:elevation="4dp"
+        android:background="@drawable/navigation_mode_circle_button"
+        android:src="@drawable/ic_start_server"
+        android:layout_toStartOf="@id/start_navigation_button"
+        android:layout_above="@id/start_navigation_button"
+        android:layout_marginEnd="16dp"
+        android:visibility="visible"
+        android:scaleType="centerInside"
+        android:padding="10dp" />
+
+    <ImageButton
+        android:id="@+id/navigate_phone_button"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:elevation="4dp"
+        android:background="@drawable/navigation_mode_circle_button"
+        android:src="@drawable/ic_navigate_phone"
+        android:layout_toEndOf="@id/start_navigation_button"
+        android:layout_above="@id/start_navigation_button"
+        android:layout_marginStart="16dp"
+        android:visibility="visible"
         android:scaleType="centerInside"
         android:padding="10dp" />
 

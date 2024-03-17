@@ -14,8 +14,25 @@ data class DirectionsResult(
 )
 
 data class Route(
+    val legs: List<Leg>,
     val overview_polyline: Polyline
 )
+
+data class Leg(
+    val distance: Distance,
+    val duration: Duration
+)
+
+data class Distance(
+    val text: String,
+    val value: Int // Distance in meters
+)
+
+data class Duration(
+    val text: String,
+    val value: Int // Duration in seconds
+)
+
 
 data class Polyline(
     val points: String
@@ -30,6 +47,7 @@ class DirectionsService(private val context: Context) {
                 "origin=${start.latitude},${start.longitude}&" +
                 "destination=${end.latitude},${end.longitude}&" +
                 "mode=$mode&" +
+                "alternatives=true&" +
                 "key=${apiKey}"
         try {
             val request = Request.Builder().url(url).build()

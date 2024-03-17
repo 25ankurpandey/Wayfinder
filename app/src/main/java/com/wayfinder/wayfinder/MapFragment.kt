@@ -2,6 +2,9 @@ package com.wayfinder.wayfinder
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -9,6 +12,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -18,15 +23,20 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
+import com.google.android.gms.maps.model.Polyline
 import com.wayfinder.wayfinderar.LocationService
 import kotlinx.coroutines.launch
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
+import com.google.gson.Gson
 import com.google.maps.android.PolyUtil
+import com.wayfinder.wayfinder.MapConstants.SELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinder.MapConstants.UNSELECTED_POLYLINE_WIDTH
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,40 +52,22 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var myLocationButton: ImageButton
     private lateinit var walkingButton: ImageButton
     private lateinit var drivingButton: ImageButton
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
+    private lateinit var startServerButton: ImageButton
+    private lateinit var navigatePhoneButton: ImageButton
+    private var polylineToRouteMap: MutableMap<Polyline, Route> = mutableMapOf()
+    private var selectedPolyline: Polyline? = null
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_map, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
-        mapFragment?.getMapAsync(this)
-        locationService = LocationService(requireContext())
-
-        walkingButton = view.findViewById(R.id.walking_button)
-        drivingButton = view.findViewById(R.id.driving_button)
-        directionsButton = view.findViewById(R.id.directions_button)
-        startNavigationButton = view.findViewById(R.id.start_navigation_button)
-        myLocationButton = view.findViewById(R.id.my_location_button)
-
-        setupMyLocationButton()
+        initializeMapFragment()
+        setupButtons(view)
         setupAutocompleteFragment()
-        setupDirectionsButton()
-        setupStartNavigationButton()
-        setupWalkingButton()
-        setupDrivingButton()
-
-        myLocationButton.visibility = View.VISIBLE
-        directionsButton.visibility = View.GONE
-        walkingButton.visibility = View.GONE
-        drivingButton.visibility = View.GONE
-        startNavigationButton.visibility = View.GONE
     }
-
     private fun setupDirectionsButton() {
         directionsButton.setOnClickListener {
             // Toggle the visibility of walking and driving buttons
@@ -84,47 +76,83 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-
-    private fun setupMyLocationButton() {
-        myLocationButton.setOnClickListener {
-            moveToCurrentLocation()
-        }
+    private fun initializeMapFragment() {
+        val mapFragment = childFragmentManager.findFragmentById(R.id.map) as SupportMapFragment?
+        mapFragment?.getMapAsync(this)
+        locationService = LocationService(requireContext())
     }
 
-    private fun setupWalkingButton() {
-        walkingButton.setOnClickListener {
-            destinationLatLng?.let { destination ->
-                // If current location is not known, fetch it first
-                if (currentLocationLatLng == null) {
-                    fetchCurrentLocationAndDisplayRoutes(destination, "walking")
-                } else {
-                    fetchAndDisplayRoutes(currentLocationLatLng!!, destination, "walking")
-                }
+    private fun setupButtons(view: View) {
+        directionsButton = view.findViewById(R.id.directions_button)
+        startNavigationButton = view.findViewById(R.id.start_navigation_button)
+        myLocationButton = view.findViewById(R.id.my_location_button)
+        walkingButton = view.findViewById(R.id.walking_button)
+        drivingButton = view.findViewById(R.id.driving_button)
+        startServerButton = view.findViewById(R.id.start_server_button)
+        navigatePhoneButton = view.findViewById(R.id.navigate_phone_button)
+
+        myLocationButton.setOnClickListener { moveToCurrentLocation() }
+        directionsButton.setOnClickListener { toggleRouteOptionsVisibility() }
+        walkingButton.setOnClickListener { fetchRoute("walking") }
+        drivingButton.setOnClickListener { fetchRoute("driving") }
+        startNavigationButton.setOnClickListener { startNavigation() }
+        startServerButton.setOnClickListener { startNavigation() }
+        navigatePhoneButton.setOnClickListener { startPhoneNavigation() }
+        startServerButton.setOnClickListener { startDeviceDiscovery() }
+
+        myLocationButton.visibility = View.VISIBLE
+        directionsButton.visibility = View.GONE
+        walkingButton.visibility = View.GONE
+        drivingButton.visibility = View.GONE
+        startNavigationButton.visibility = View.GONE
+        startServerButton.visibility = View.GONE
+        navigatePhoneButton.visibility = View.GONE
+    }
+
+    private fun startDeviceDiscovery() {
+        TODO("Not yet implemented")
+    }
+
+    private fun startPhoneNavigation() {
+        TODO("Not yet implemented")
+    }
+
+    private fun toggleRouteOptionsVisibility() {
+        val visibility = if (walkingButton.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        walkingButton.visibility = visibility
+        drivingButton.visibility = visibility
+    }
+
+    private fun fetchRoute(mode: String) {
+        destinationLatLng?.let { destination ->
+            if (currentLocationLatLng == null) {
+                fetchCurrentLocationAndDisplayRoutes(destination, mode)
+            } else {
+                fetchAndDisplayRoutes(currentLocationLatLng!!, destination, mode)
             }
         }
     }
 
-    private fun setupDrivingButton() {
-        drivingButton.setOnClickListener {
-            destinationLatLng?.let { destination ->
-                // If current location is not known, fetch it first
-                if (currentLocationLatLng == null) {
-                    fetchCurrentLocationAndDisplayRoutes(destination, "driving")
-                } else {
-                    fetchAndDisplayRoutes(currentLocationLatLng!!, destination, "driving")
-                }
-            }
-        }
+    private fun startNavigation() {
+        Log.d("MapFragment", "Starting navigation")
+        val visibility = if (startServerButton.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        startServerButton.visibility = visibility
+        navigatePhoneButton.visibility = visibility
     }
 
+    override fun onMapReady(googleMap: GoogleMap) {
+        mMap = googleMap
+        setupMap()
+    }
 
-
-    private fun setupStartNavigationButton() {
-        startNavigationButton.visibility = View.GONE // Initially hide the start navigation button
-        startNavigationButton.setOnClickListener {
-            startNavigationButton.visibility = View.GONE // Initially hide the start navigation button
-            Log.d("MapFragment", "Starting navigation")
-            // Implement the navigation start logic here
+    private fun setupMap() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            mMap.isMyLocationEnabled = true
+            mMap.uiSettings.isMyLocationButtonEnabled = false
+            fetchLocationAndDisplay()
+        }
+        mMap.setOnPolylineClickListener { polyline ->
+            selectPolyline(polyline)
         }
     }
 
@@ -192,12 +220,44 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         lifecycleScope.launch {
             try {
                 val directionsService = DirectionsService(requireContext())
-                val result = directionsService.getDirections(start, end, mode) // Update the method to accept mode
-                result?.routes?.firstOrNull()?.let { route ->
-                    val polylineOptions = PolylineOptions().addAll(PolyUtil.decode(route.overview_polyline.points))
-                    mMap.clear()
-                    mMap.addPolyline(polylineOptions)
-                    adjustCameraToRouteAndShowButton(PolyUtil.decode(route.overview_polyline.points))
+                val result = directionsService.getDirections(start, end, mode)
+                var isFirstRoute = true // Flag to identify the first (default-selected) route
+
+                result?.routes?.forEachIndexed { index, route ->
+                    val (totalDistance, totalTime) = calculateTotalDistanceAndTime(route)
+                    Log.d("RouteInfo", "Route $index: Distance = $totalDistance, Time = $totalTime")
+                    val midpoint = calculateMidpoint(route)
+                    showRouteInfoMarker(midpoint, totalDistance, totalTime)
+
+                    val shadowPolylineOptions = PolylineOptions()
+                        .addAll(PolyUtil.decode(route.overview_polyline.points))
+                        .width(SELECTED_POLYLINE_WIDTH + 5)
+                        .color(Color.argb(80, 0, 0, 0))
+                        .zIndex(0f)
+
+                    val polylineOptions = PolylineOptions()
+                        .addAll(PolyUtil.decode(route.overview_polyline.points))
+                        .color(ContextCompat.getColor(requireContext(), if (isFirstRoute) R.color.selectedPolylineColor else R.color.unselectedPolylineColor))
+                        .width(if (isFirstRoute) SELECTED_POLYLINE_WIDTH else UNSELECTED_POLYLINE_WIDTH)
+                        .clickable(true)
+                        .zIndex(if (isFirstRoute) 1f else 0f) // Set zIndex to 1 for the first route to render it on top
+
+                    mMap.addPolyline(shadowPolylineOptions)
+                    val polyline = mMap.addPolyline(polylineOptions)
+                    polyline.tag = route
+
+                    if (isFirstRoute) {
+                        // Log the default-selected route
+                        Log.d("SelectedRoute", "Default-selected route: ${Gson().toJson(route)}")
+                        selectedPolyline = polyline
+                        isFirstRoute = false // Reset the flag after the first route
+                    }
+
+                    polylineToRouteMap[polyline] = route
+                }
+
+                if (result?.routes?.isNotEmpty() == true) {
+                    adjustCameraToRouteAndShowButton(PolyUtil.decode(result.routes.first().overview_polyline.points))
                 }
             } catch (e: Exception) {
                 Log.e("MapFragment", "Error fetching routes: ${e.message}")
@@ -205,7 +265,77 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    private fun calculateTotalDistanceAndTime(route: Route): Pair<String, String> {
+        var totalDistanceMeters = 0
+        var totalDurationSeconds = 0
 
+        route.legs.forEach { leg ->
+            totalDistanceMeters += leg.distance.value
+            totalDurationSeconds += leg.duration.value
+        }
+
+        val totalDistanceKm = totalDistanceMeters / 1000.0
+        val totalDurationHours = totalDurationSeconds / 3600
+        val totalDurationMinutes = (totalDurationSeconds % 3600) / 60
+
+        val distanceText = String.format("%.2f km", totalDistanceKm)
+        val durationText = if (totalDurationHours > 0) {
+            "${totalDurationHours}h ${totalDurationMinutes}min"
+        } else {
+            "${totalDurationMinutes}min"
+        }
+
+        return Pair(distanceText, durationText)
+    }
+
+    private fun calculateMidpoint(route: Route): LatLng {
+        val decodedPath = PolyUtil.decode(route.overview_polyline.points)
+        return decodedPath[decodedPath.size / 2] // Get the midpoint for simplicity
+    }
+
+    private fun generateCustomMarkerView(distance: String, duration: String): Bitmap {
+        val view = LayoutInflater.from(context).inflate(R.layout.layout_route_info_window, null)
+        val routeInfoTextView = view.findViewById<TextView>(R.id.route_info)
+        routeInfoTextView.text = distance + ", " + duration
+
+        view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+
+        val bitmap = Bitmap.createBitmap(view.measuredWidth, view.measuredHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        view.draw(canvas)
+
+        return bitmap
+    }
+
+    private fun showRouteInfoMarker(location: LatLng, distance: String, duration: String) {
+        val icon = BitmapDescriptorFactory.fromBitmap(generateCustomMarkerView(distance, duration))
+        val markerOptions = MarkerOptions()
+            .position(location)
+            .icon(icon)
+
+        mMap.addMarker(markerOptions)
+    }
+
+    private fun selectPolyline(selectedPolyline: Polyline) {
+        this.selectedPolyline?.color = ContextCompat.getColor(requireContext(), R.color.unselectedPolylineColor)
+        this.selectedPolyline?.width = UNSELECTED_POLYLINE_WIDTH
+
+        selectedPolyline.color = ContextCompat.getColor(requireContext(), R.color.selectedPolylineColor)
+        selectedPolyline.width = SELECTED_POLYLINE_WIDTH
+        selectedPolyline.zIndex = 1f // Ensure the selected path appears on top
+
+        // Reset the zIndex for previously selected polyline
+        this.selectedPolyline?.zIndex = 0f
+
+        // Update the reference to the currently selected polyline
+        this.selectedPolyline = selectedPolyline
+
+        // Log the selected route
+        polylineToRouteMap[selectedPolyline]?.let { selectedRoute ->
+            Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
+        }
+    }
     private suspend fun adjustCameraToRouteAndShowButton(routePoints: List<LatLng>) {
         val deferredCompletion = CompletableDeferred<Unit>()
 
@@ -245,17 +375,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             currentLocationLatLng?.let { currentLocation ->
                 fetchAndDisplayRoutes(currentLocation, destination, mode)
             } ?: Log.d("MapFragment", "Current location is null after fetch attempt.")
-        }
-    }
-
-
-    override fun onMapReady(googleMap: GoogleMap) {
-        mMap = googleMap
-
-        if (ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            mMap.isMyLocationEnabled = true
-            mMap.uiSettings.isMyLocationButtonEnabled = false
-            fetchLocationAndDisplay()
         }
     }
 }
