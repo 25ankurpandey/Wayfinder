@@ -10,17 +10,62 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 data class DirectionsResult(
-    val routes: List<Route>
+    val geocoded_waypoints: List<GeocodedWaypoint>,
+    val routes: List<Route>,
+    val status: String
+)
+
+data class GeocodedWaypoint(
+    val geocoder_status: String,
+    val place_id: String,
+    val types: List<String>,
+    val partial_match: Boolean? = null // Optional field
 )
 
 data class Route(
+    val bounds: Bounds,
     val legs: List<Leg>,
-    val overview_polyline: Polyline
+    val overview_polyline: Polyline,
+    val summary: String,
+    val warnings: List<String>,
+    val waypoint_order: List<Int>
+)
+
+data class Bounds(
+    val northeast: Location,
+    val southwest: Location
 )
 
 data class Leg(
     val distance: Distance,
-    val duration: Duration
+    val duration: Duration,
+    val end_address: String,
+    val end_location: Location,
+    val start_address: String,
+    val start_location: Location,
+    val steps: List<Step>,
+    val traffic_speed_entry: List<Any>, // Placeholder for actual traffic speed entry model if required
+    val via_waypoint: List<Any> // Placeholder for actual via waypoint model if required
+)
+
+data class Step(
+    val distance: Distance,
+    val duration: Duration,
+    val end_location: Location,
+    val html_instructions: String,
+    val polyline: Polyline,
+    val start_location: Location,
+    val travel_mode: String,
+    val maneuver: String? // Optional field
+)
+
+data class Location(
+    val lat: Double,
+    val lng: Double
+)
+
+data class Polyline(
+    val points: String
 )
 
 data class Distance(
@@ -33,10 +78,6 @@ data class Duration(
     val value: Int // Duration in seconds
 )
 
-
-data class Polyline(
-    val points: String
-)
 
 class DirectionsService(private val context: Context) {
     private val client = OkHttpClient()
@@ -53,6 +94,7 @@ class DirectionsService(private val context: Context) {
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val body = response.body?.string()
+            Log.d("88888888888888888888888888888888888888",body.toString())
 
             body?.let {
                 return@withContext Gson().fromJson(it, DirectionsResult::class.java)

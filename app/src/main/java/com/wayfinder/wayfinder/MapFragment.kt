@@ -38,6 +38,7 @@ import com.google.gson.Gson
 import com.google.maps.android.PolyUtil
 import com.wayfinder.wayfinder.MapConstants.SELECTED_POLYLINE_WIDTH
 import com.wayfinder.wayfinder.MapConstants.UNSELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinderar.RouteConverter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,6 +47,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var locationService: LocationService
+    private val routeConverter = RouteConverter()
     private var currentLocationLatLng: LatLng? = null
     private var destinationLatLng: LatLng? = null
     private lateinit var directionsButton: ImageButton
@@ -98,7 +100,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         walkingButton.setOnClickListener { fetchRoute("walking") }
         drivingButton.setOnClickListener { fetchRoute("driving") }
         startNavigationButton.setOnClickListener { startNavigation() }
-        startServerButton.setOnClickListener { startNavigation() }
         navigatePhoneButton.setOnClickListener { startPhoneNavigation() }
         startServerButton.setOnClickListener { showDeviceDiscovery() }
 
@@ -113,7 +114,18 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun showDeviceDiscovery() {
         val deviceDiscoveryDialog = DeviceDiscoveryDialog { deviceInfo ->
-            Toast.makeText(context, "Device clicked: ${deviceInfo.deviceName}", Toast.LENGTH_SHORT).show()
+            routeConverter.lastConvertedRoute?.let { unityCoords ->
+                val dataToSend = Gson().toJson(unityCoords)
+                val tcpClient = TcpClient()
+                tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess ->
+                    val message = if (isSuccess) "Data sent successfully to ${deviceInfo.deviceName}" else "Failed to send data to ${deviceInfo.deviceName}"
+                    activity?.runOnUiThread {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } ?: run {
+                Toast.makeText(context, "No route selected or conversion error.", Toast.LENGTH_SHORT).show()
+            }
         }
         deviceDiscoveryDialog.show(childFragmentManager, deviceDiscoveryDialog.tag)
 
@@ -124,6 +136,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             }
         }.startDiscovery()
     }
+
 
 
     private fun startPhoneNavigation() {
@@ -199,6 +212,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         myLocationButton.visibility = View.GONE
         walkingButton.visibility = View.GONE
         drivingButton.visibility = View.GONE
+        startServerButton.visibility = View.GONE
+        navigatePhoneButton.visibility = View.GONE
         startNavigationButton.visibility = View.VISIBLE
     }
 
@@ -232,6 +247,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                     startNavigationButton.visibility = View.GONE // Hide start navigation button until needed
                     walkingButton.visibility = View.GONE // Ensure walking button is hidden
                     drivingButton.visibility = View.GONE // Ensure driving button is hidden
+                    startServerButton.visibility = View.GONE
+                    navigatePhoneButton.visibility = View.GONE
                 }
             }
 
@@ -246,6 +263,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             try {
                 val directionsService = DirectionsService(requireContext())
                 val result = directionsService.getDirections(start, end, mode)
+                Log.d("111111111111111111111111111111",result.toString())
+
                 var isFirstRoute = true // Flag to identify the first (default-selected) route
 
                 result?.routes?.forEachIndexed { index, route ->
@@ -345,7 +364,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-
     private fun selectPolyline(polyline: Polyline) {
         // Deselect all polylines and markers first
         for ((poly, _) in polylineToRouteMap) {
@@ -386,6 +404,17 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         // Log the selected route for debugging
         Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
+
+        polylineToRouteMap[polyline]?.let { route ->
+            // Assuming you serialize the route to JSON
+            val routeJson = Gson().toJson(route) // Adjust this based on how you get the route JSON
+            Log.d("***************************************",routeJson.toString())
+
+            currentLocationLatLng?.let {
+                val customLatLng = toCustomLatLng(it) // Convert to custom LatLng
+                routeConverter.convertJsonRouteToUnityCoords(routeJson, customLatLng)
+            }
+        }
     }
 
     private suspend fun adjustCameraToRouteAndShowButton(routePoints: List<LatLng>) {
@@ -429,4 +458,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             } ?: Log.d("MapFragment", "Current location is null after fetch attempt.")
         }
     }
+
+    private fun toCustomLatLng(googleLatLng: com.google.android.gms.maps.model.LatLng): com.wayfinder.wayfinderar.RouteConverter.LatLng {
+        return com.wayfinder.wayfinderar.RouteConverter.LatLng(googleLatLng.latitude, googleLatLng.longitude)
+    }
+
+    private fun toGoogleLatLng(customLatLng: com.wayfinder.wayfinderar.RouteConverter.LatLng): com.google.android.gms.maps.model.LatLng {
+        return com.google.android.gms.maps.model.LatLng(customLatLng.latitude, customLatLng.longitude)
+    }
+
 }
