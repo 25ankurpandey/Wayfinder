@@ -117,6 +117,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun showDeviceDiscoveryAndConvertRoute() {
+        if (selectedRouteJson.isNullOrEmpty()) {
+            Toast.makeText(context, "Please select a route first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         lifecycleScope.launch {
             val deviceDiscoveryTask = async { startDeviceDiscovery() }
             val routeConversionTask = async { convertRoute() }
@@ -153,27 +158,36 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private suspend fun convertRoute() {
-        try {
-            selectedRouteJson?.let { json ->
+        selectedRouteJson?.let { json ->
+            try {
                 currentLocationLatLng?.let { currentLocation ->
-                    val customLatLng = toCustomLatLng(currentLocation) // Convert to custom LatLng
+                    val customLatLng = toCustomLatLng(currentLocation)
                     routeConverter.convertJsonRouteToUnityCoords(json, customLatLng)
                     routeConversionCompleted = true
+                    checkAndTransmitPendingData()
                 }
+            } catch (e: Exception) {
+                Log.e("MapFragment", "Route conversion failed: ${e.message}")
+                routeConversionCompleted = false
+                Toast.makeText(context, "Route conversion failed. Please try again.", Toast.LENGTH_LONG).show()
             }
-        } catch (e: Exception) {
-            Log.e("MapFragment", "Route conversion failed: ${e.message}")
-            routeConversionCompleted = false
-            // Notify the user about the error and handle accordingly
+        } ?: run {
+            Log.e("MapFragment", "No route selected for conversion.")
+            Toast.makeText(context, "No route selected. Please select a route and try again.", Toast.LENGTH_LONG).show()
         }
     }
 
+    private fun checkAndTransmitPendingData() {
+        pendingTransmissionDevice?.let {
+            transmitDataToDevice(it)
+            pendingTransmissionDevice = null
+        }
+    }
     private fun transmitDataToDevice(deviceInfo: DeviceInfo) {
         routeConverter.lastConvertedRoute?.let { unityCoords ->
             val dataToSend = Gson().toJson(unityCoords)
             val tcpClient = TcpClient()
-            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess ->
-                val message = if (isSuccess) "Data sent successfully to ${deviceInfo.deviceName}" else "Failed to send data to ${deviceInfo.deviceName}"
+            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess, message ->
                 activity?.runOnUiThread {
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
