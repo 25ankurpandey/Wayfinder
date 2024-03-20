@@ -4,20 +4,23 @@ import java.io.PrintWriter
 import java.net.Socket
 
 class TcpClient {
-    fun sendData(host: String, port: Int, data: String, onResult: (Boolean, String) -> Unit) {
+    companion object {
+        const val CONNECTION_TIMEOUT = 5000
+    }
+
+    fun sendData(host: String, port: Int, data: String, deviceName: String?, onResult: (Boolean, String) -> Unit) {
         Thread {
             try {
-                Socket(host, port).use { socket ->
+                Socket().use { socket ->
+                    socket.connect(java.net.InetSocketAddress(host, port), CONNECTION_TIMEOUT)
                     PrintWriter(socket.getOutputStream(), true).use { out ->
                         out.println(data)
-                        // Assuming the transmission is always successful if no exceptions are thrown
-                        onResult(true, "Data sent successfully.")
+                        onResult(true, "Data sent successfully to $deviceName.")
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Include a more descriptive message about the error
-                onResult(false, "Failed to send data: ${e.localizedMessage}")
+                onResult(false, "Failed to send data to $deviceName")
             }
         }.start()
     }

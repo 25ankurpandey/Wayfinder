@@ -24,10 +24,13 @@ class UdpDiscovery(private val onDeviceDiscovered: (DeviceInfo) -> Unit) {
                     val receivedString = String(packet.data, 0, packet.length)
                     Log.d("UDP Discovery", "Received: $receivedString")
                     if (receivedString.startsWith("Quest3_Presence:")) {
-                        val parts = receivedString.split("|").map { it.trim() }
-                        val ipAddress = parts[0].substringAfterLast(':')
-                        val deviceName = parts.getOrNull(1)?.substringAfter("DeviceName:")?.ifEmpty { null }
-                        onDeviceDiscovered(DeviceInfo(ipAddress, deviceName))
+                        // Correctly split the string by ":" and expect three parts: prefix, IP, and Name
+                        val parts = receivedString.split(":").map { it.trim() }
+                        if (parts.size >= 3) {
+                            val ipAddress = parts[1] // IP Address
+                            val deviceName = parts[2] // Device Name
+                            onDeviceDiscovered(DeviceInfo(ipAddress, deviceName, System.currentTimeMillis()))
+                        }
                     }
                 }
                 // socket.close() // Removed to keep listening; close elsewhere as needed

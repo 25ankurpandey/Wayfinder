@@ -1,10 +1,12 @@
 package com.wayfinder.wayfinder
 
 import android.Manifest
+import android.app.Dialog
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -64,6 +66,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var selectedRouteJson: String? = null
     private var routeConversionCompleted = false
     private var pendingTransmissionDevice: DeviceInfo? = null
+    private var progressDialog: Dialog? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         // Inflate the layout for this fragment
@@ -187,8 +190,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         routeConverter.lastConvertedRoute?.let { unityCoords ->
             val dataToSend = Gson().toJson(unityCoords)
             val tcpClient = TcpClient()
-            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess, message ->
+
+            activity?.runOnUiThread {
+                showDataTransmissionProgressDialog()
+                Toast.makeText(context, "Sending navigation data...", Toast.LENGTH_SHORT).show()
+            }
+
+            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend, deviceInfo.deviceName) { isSuccess, message ->
                 activity?.runOnUiThread {
+                    dismissDataTransmissionProgressDialog()
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
             }
@@ -509,6 +519,19 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                 fetchAndDisplayRoutes(currentLocation, destination, mode)
             } ?: Log.d("MapFragment", "Current location is null after fetch attempt.")
         }
+    }
+
+    private fun showDataTransmissionProgressDialog() {
+        progressDialog = Dialog(requireContext()).apply {
+            setContentView(R.layout.data_transmission_progress)
+            setCancelable(false)
+            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            show()
+        }
+    }
+
+    private fun dismissDataTransmissionProgressDialog() {
+        progressDialog?.dismiss()
     }
 
     private fun toCustomLatLng(googleLatLng: com.google.android.gms.maps.model.LatLng): com.wayfinder.wayfinderar.RouteConverter.LatLng {
