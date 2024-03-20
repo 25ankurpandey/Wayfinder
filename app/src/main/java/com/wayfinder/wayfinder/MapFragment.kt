@@ -41,6 +41,7 @@ import com.wayfinder.wayfinder.MapConstants.UNSELECTED_POLYLINE_WIDTH
 import com.wayfinder.wayfinderar.RouteConverter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 class MapFragment : Fragment(), OnMapReadyCallback {
@@ -60,6 +61,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var polylineToRouteMap: MutableMap<Polyline, Route> = mutableMapOf()
     private var selectedPolyline: Polyline? = null
     private var routeInfoMarkerToRouteMap: MutableMap<Marker, Route> = mutableMapOf()
+    private var selectedRouteJson: String? = null
+    private var routeConversionCompleted = false
+    private var pendingTransmissionDevice: DeviceInfo? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         // Inflate the layout for this fragment
@@ -101,7 +105,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         drivingButton.setOnClickListener { fetchRoute("driving") }
         startNavigationButton.setOnClickListener { startNavigation() }
         navigatePhoneButton.setOnClickListener { startPhoneNavigation() }
-        startServerButton.setOnClickListener { showDeviceDiscovery() }
+        startServerButton.setOnClickListener { showDeviceDiscoveryAndConvertRoute() }
 
         myLocationButton.visibility = View.VISIBLE
         directionsButton.visibility = View.GONE
@@ -112,19 +116,30 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         navigatePhoneButton.visibility = View.GONE
     }
 
-    private fun showDeviceDiscovery() {
+    private fun showDeviceDiscoveryAndConvertRoute() {
+        lifecycleScope.launch {
+            val deviceDiscoveryTask = async { startDeviceDiscovery() }
+            val routeConversionTask = async { convertRoute() }
+
+            // Await both tasks to ensure both operations are complete before proceeding
+            deviceDiscoveryTask.await()
+            routeConversionTask.await()
+
+            // Now check if there's a pending device and if route conversion is completed
+            if (routeConversionCompleted && pendingTransmissionDevice != null) {
+                transmitDataToDevice(pendingTransmissionDevice!!)
+                pendingTransmissionDevice = null // Clear the pending device
+            }
+        }
+    }
+
+    private suspend fun startDeviceDiscovery() {
         val deviceDiscoveryDialog = DeviceDiscoveryDialog { deviceInfo ->
-            routeConverter.lastConvertedRoute?.let { unityCoords ->
-                val dataToSend = Gson().toJson(unityCoords)
-                val tcpClient = TcpClient()
-                tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess ->
-                    val message = if (isSuccess) "Data sent successfully to ${deviceInfo.deviceName}" else "Failed to send data to ${deviceInfo.deviceName}"
-                    activity?.runOnUiThread {
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } ?: run {
-                Toast.makeText(context, "No route selected or conversion error.", Toast.LENGTH_SHORT).show()
+            // Assume this callback is triggered when a device is selected from the dialog
+            if (routeConversionCompleted) {
+                transmitDataToDevice(deviceInfo)
+            } else {
+                pendingTransmissionDevice = deviceInfo
             }
         }
         deviceDiscoveryDialog.show(childFragmentManager, deviceDiscoveryDialog.tag)
@@ -137,7 +152,36 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }.startDiscovery()
     }
 
+    private suspend fun convertRoute() {
+        try {
+            selectedRouteJson?.let { json ->
+                currentLocationLatLng?.let { currentLocation ->
+                    val customLatLng = toCustomLatLng(currentLocation) // Convert to custom LatLng
+                    routeConverter.convertJsonRouteToUnityCoords(json, customLatLng)
+                    routeConversionCompleted = true
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MapFragment", "Route conversion failed: ${e.message}")
+            routeConversionCompleted = false
+            // Notify the user about the error and handle accordingly
+        }
+    }
 
+    private fun transmitDataToDevice(deviceInfo: DeviceInfo) {
+        routeConverter.lastConvertedRoute?.let { unityCoords ->
+            val dataToSend = Gson().toJson(unityCoords)
+            val tcpClient = TcpClient()
+            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend) { isSuccess ->
+                val message = if (isSuccess) "Data sent successfully to ${deviceInfo.deviceName}" else "Failed to send data to ${deviceInfo.deviceName}"
+                activity?.runOnUiThread {
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        } ?: run {
+            Toast.makeText(context, "No route selected or conversion error.", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun startPhoneNavigation() {
         Toast.makeText(context, "Yet to implement.", Toast.LENGTH_SHORT).show()
@@ -263,7 +307,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             try {
                 val directionsService = DirectionsService(requireContext())
                 val result = directionsService.getDirections(start, end, mode)
-                Log.d("111111111111111111111111111111",result.toString())
+//                Log.d("111111111111111111111111111111",result.toString())
 
                 var isFirstRoute = true // Flag to identify the first (default-selected) route
 
@@ -293,6 +337,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                         // Log the default-selected route
                         Log.d("SelectedRoute", "Default-selected route: ${Gson().toJson(route)}")
                         selectedPolyline = polyline
+                        selectedRouteJson = Gson().toJson(route)
                         isFirstRoute = false // Reset the flag after the first route
                     }
 
@@ -406,14 +451,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
 
         polylineToRouteMap[polyline]?.let { route ->
-            // Assuming you serialize the route to JSON
-            val routeJson = Gson().toJson(route) // Adjust this based on how you get the route JSON
-            Log.d("***************************************",routeJson.toString())
-
-            currentLocationLatLng?.let {
-                val customLatLng = toCustomLatLng(it) // Convert to custom LatLng
-                routeConverter.convertJsonRouteToUnityCoords(routeJson, customLatLng)
-            }
+            selectedRouteJson = Gson().toJson(route)
         }
     }
 

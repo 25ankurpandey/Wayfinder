@@ -94,7 +94,6 @@ class DirectionsService(private val context: Context) {
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val body = response.body?.string()
-            Log.d("88888888888888888888888888888888888888",body.toString())
 
             body?.let {
                 return@withContext Gson().fromJson(it, DirectionsResult::class.java)

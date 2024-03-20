@@ -9,11 +9,13 @@ class RouteConverter(private val scaleFactor: Double = 0.01) {
         private set
 
     fun convertJsonRouteToUnityCoords(jsonResponse: String, currentLocation: LatLng) {
+        Log.d("88888888888888888888888888888888888",jsonResponse)
         val jsonObject = JSONObject(jsonResponse)
         val (decodedPolyline, stepsTotalDistance) = decodeStepsPolyline(jsonObject)
         Log.d("Total distance", stepsTotalDistance.toString())
 //        val decodedOverviewPolyline = decodeOverviewPolyline(jsonObject)
         val unityCoords = convertToUnityCoords(decodedPolyline, currentLocation)
+        Log.d("Unity coords",unityCoords.toString())
         Log.d("Unity coords array size",unityCoords.size.toString())
 
         lastConvertedRoute = unityCoords
