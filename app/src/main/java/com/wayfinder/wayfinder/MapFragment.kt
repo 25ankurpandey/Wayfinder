@@ -208,8 +208,21 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun startPhoneNavigation() {
-        Toast.makeText(context, "Yet to implement.", Toast.LENGTH_SHORT).show()
+        // Create a new instance of NavigationFragment, passing the selected route JSON via fragment arguments
+        val navigationFragment = NavigationFragment().apply {
+            arguments = Bundle().apply {
+                putString("selectedRouteJson", selectedRouteJson)
+            }
+        }
+
+        // Replace the current fragment with NavigationFragment
+        // Ensure the container ID matches your layout's
+        activity?.supportFragmentManager?.beginTransaction()
+            ?.replace(R.id.fragment_container, navigationFragment)
+            ?.addToBackStack(null) // Optional: Add transaction to the back stack for user navigation
+            ?.commit()
     }
+
 
     private fun toggleRouteOptionsVisibility() {
         val visibility = if (walkingButton.visibility == View.VISIBLE) View.GONE else View.VISIBLE
