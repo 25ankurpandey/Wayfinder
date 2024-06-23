@@ -102,3 +102,10 @@ bash
 - Create a new branch for your feature or bug fix.
 - Commit your changes and push your branch.
 - Create a pull request detailing your changes.
+
+![Screenshot_20240623-202918](https://github.com/25ankurpandey/Wayfinder/assets/98592023/4f5b30e6-d69b-4bbd-8157-426374bf8d73)
+![Screenshot_20240623-202959](https://github.com/25ankurpandey/Wayfinder/assets/98592023/1e794a8d-bdf1-4289-b63a-1bf9847f74ab)
+![Screenshot_20240623-203008](https://github.com/25ankurpandey/Wayfinder/assets/98592023/c60d8afc-0970-4108-89a0-611cff549bf7)
+![Screenshot_20240623-203028](https://github.com/25ankurpandey/Wayfinder/assets/98592023/89d7a4ff-3125-47df-864d-55fd3e63a5cb)
+
+
