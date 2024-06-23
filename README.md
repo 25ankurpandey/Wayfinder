@@ -71,6 +71,7 @@ bash
    - Open the WayFinder companion app in the VR environment.  //App under development
    - Experience real-time navigation in a mixed reality setting.
 
+
 ### Components
 
 - **Model**: Handles data and business logic.
@@ -94,11 +95,10 @@ bash
 - **UI Components**: Material Design
 - **Google Maps**: Google Maps SDK for Android
 
-### Usage
 
-```kotlin
-// Fetch current location
-val location = apiService.getLocation()
+### Contributing
 
-// Send navigation data to VR device
-val response = apiService.sendNavigationData(navigationData)
+- Fork the repository.
+- Create a new branch for your feature or bug fix.
+- Commit your changes and push your branch.
+- Create a pull request detailing your changes.
