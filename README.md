@@ -39,6 +39,7 @@
 bash
    git clone https://github.com/25ankurpandey/WayFinder.git
    cd WayFinder
+   
 2. **Open in Android Studio**:
    Open the cloned project in Android Studio.
 
