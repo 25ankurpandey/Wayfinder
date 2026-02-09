@@ -1,13 +1,368 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
     tools:context=".MainActivity">
 
-    <FrameLayout
-        android:id="@+id/fragment_container"
+    <!-- Main content container -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="match_parent">
 
-</RelativeLayout>
+        <!-- Top App Bar with connection status -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/app_bar_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            app:elevation="0dp"
+            app:liftOnScroll="false">
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@color/glass_background"
+                app:navigationIcon="@drawable/ic_menu"
+                app:navigationIconTint="@color/white"
+                app:title="@string/app_name"
+                app:titleTextColor="@color/white"
+                app:contentInsetEnd="0dp">
+
+                <!-- Connection Status Container (inside toolbar) -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginEnd="8dp"
+                    android:orientation="vertical">
+
+                    <!-- Connection Status Indicator (clickable to toggle disconnect option) -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/connection_status_card"
+                        style="@style/Theme.Wayfinder.GlassCard"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        app:cardCornerRadius="16dp">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="6dp">
+
+                            <View
+                                android:id="@+id/connection_indicator"
+                                android:layout_width="8dp"
+                                android:layout_height="8dp"
+                                android:background="@drawable/connection_indicator_disconnected" />
+
+                            <TextView
+                                android:id="@+id/connection_status_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="@string/status_disconnected"
+                                android:textColor="@color/white"
+                                android:textSize="11sp"
+                                android:maxWidth="140dp"
+                                android:ellipsize="end"
+                                android:singleLine="true" />
+
+                            <ImageView
+                                android:id="@+id/connection_dropdown_arrow"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginStart="2dp"
+                                android:src="@drawable/ic_arrow_down"
+                                android:visibility="gone"
+                                app:tint="@color/text_secondary" />
+
+                        </LinearLayout>
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                </LinearLayout>
+
+            </com.google.android.material.appbar.MaterialToolbar>
+
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Fragment container for Map screen -->
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/fragment_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+        <!-- Debug Log Overlay (semi-transparent, bottom portion, doesn't block map) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/debug_log_card"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="#CC1A1A1A"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <!-- Header with title and buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Debug Logs"
+                        android:textColor="@color/cyan_primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <ImageButton
+                        android:id="@+id/debug_copy_button"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Copy logs"
+                        android:src="@android:drawable/ic_menu_edit"
+                        app:tint="@color/white" />
+
+                    <ImageButton
+                        android:id="@+id/debug_clear_button"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Clear logs"
+                        android:src="@android:drawable/ic_menu_delete"
+                        app:tint="@color/white" />
+
+                    <ImageButton
+                        android:id="@+id/debug_close_button"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Close debug"
+                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        app:tint="@color/white" />
+
+                </LinearLayout>
+
+                <!-- Scrollable log text -->
+                <ScrollView
+                    android:id="@+id/debug_scroll_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="4dp"
+                    android:fillViewport="true">
+
+                    <TextView
+                        android:id="@+id/debug_log_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text=""
+                        android:textColor="#AAFFFFFF"
+                        android:textSize="10sp" />
+
+                </ScrollView>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+
+        <!-- Route Info Bottom Sheet -->
+        <androidx.coordinatorlayout.widget.CoordinatorLayout
+            android:id="@+id/route_bottom_sheet_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:visibility="gone">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/route_info_card"
+                style="@style/Theme.Wayfinder.GlassCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- Drag handle -->
+                    <View
+                        android:layout_width="40dp"
+                        android:layout_height="4dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginBottom="12dp"
+                        android:background="@drawable/bottom_sheet_handle" />
+
+                    <!-- Route summary row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/route_distance_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="24sp"
+                                android:textColor="@color/white"
+                                android:textStyle="bold"
+                                tools:text="2.5 km" />
+
+                            <TextView
+                                android:id="@+id/route_eta_text"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="@color/cyan_light"
+                                tools:text="ETA 25 min" />
+
+                        </LinearLayout>
+
+                        <!-- Travel Mode Chips -->
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/travel_mode_chips"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:singleSelection="true"
+                            app:selectionRequired="true">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chip_walking"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/route_mode_walking"
+                                app:chipIcon="@drawable/ic_walk"
+                                app:chipBackgroundColor="@color/dark_surface_container" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chip_driving"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/route_mode_driving"
+                                app:chipIcon="@drawable/ic_drive"
+                                app:chipBackgroundColor="@color/dark_surface_container" />
+
+                        </com.google.android.material.chip.ChipGroup>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+        <!-- Extended FAB for Start Navigation -->
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/start_navigation_fab"
+            style="@style/Theme.Wayfinder.ExtendedFab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:text="@string/action_start_navigation"
+            android:textColor="@color/black"
+            android:visibility="gone"
+            app:icon="@drawable/ic_start_navigation" />
+
+        <!-- Disconnect Dropdown (positioned below status card in toolbar) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/disconnect_dropdown"
+            style="@style/Theme.Wayfinder.GlassCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="60dp"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"
+            app:cardCornerRadius="12dp">
+
+            <LinearLayout
+                android:id="@+id/disconnect_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="10dp">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_disconnect"
+                    app:tint="@color/error" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Disconnect"
+                    android:textColor="@color/error"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Navigation Drawer -->
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navigation_view"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@color/dark_surface"
+        android:fitsSystemWindows="true"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/drawer_menu"
+        app:itemTextColor="@color/white"
+        app:itemIconTint="@color/cyan_primary" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

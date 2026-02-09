@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinderar
+package com.wayfinder.wayfinder.data.converter
 
 import android.util.Log
 import org.json.JSONObject

@@ -1,10 +1,12 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.presentation.device
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.wayfinder.wayfinder.R
+import com.wayfinder.wayfinder.core.DeviceInfo
 
 class DeviceListAdapter(
     private val devices: MutableList<DeviceInfo>, // Changed to a mutable list

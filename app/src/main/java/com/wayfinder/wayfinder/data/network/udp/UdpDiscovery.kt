@@ -1,6 +1,7 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.data.network.udp
 
 import android.util.Log
+import com.wayfinder.wayfinder.core.DeviceInfo
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress

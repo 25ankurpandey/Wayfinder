@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinderar
+package com.wayfinder.wayfinder.data.location
 
 import android.annotation.SuppressLint
 import android.content.Context

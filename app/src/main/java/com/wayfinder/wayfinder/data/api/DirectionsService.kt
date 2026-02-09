@@ -1,9 +1,10 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.data.api
 
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.maps.model.LatLng
 import com.google.gson.Gson
+import com.wayfinder.wayfinder.core.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

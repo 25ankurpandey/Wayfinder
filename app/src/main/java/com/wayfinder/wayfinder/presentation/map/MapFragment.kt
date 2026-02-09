@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.presentation.map
 
 import android.Manifest
 import android.app.Dialog
@@ -12,7 +12,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
@@ -31,21 +30,43 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.gms.maps.model.Polyline
-import com.wayfinder.wayfinderar.LocationService
-import kotlinx.coroutines.launch
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.gson.Gson
 import com.google.maps.android.PolyUtil
-import com.wayfinder.wayfinder.MapConstants.SELECTED_POLYLINE_WIDTH
-import com.wayfinder.wayfinder.MapConstants.UNSELECTED_POLYLINE_WIDTH
-import com.wayfinder.wayfinderar.RouteConverter
+import com.wayfinder.wayfinder.R
+import com.wayfinder.wayfinder.core.ConnectionState
+import com.wayfinder.wayfinder.core.MapConstants
+import com.wayfinder.wayfinder.core.MapConstants.SELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinder.core.MapConstants.UNSELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinder.core.NetworkConstants
+import com.wayfinder.wayfinder.data.api.DirectionsService
+import com.wayfinder.wayfinder.data.api.Route
+import com.wayfinder.wayfinder.data.converter.RouteConverter
+import com.wayfinder.wayfinder.data.location.LocationService
+import com.wayfinder.wayfinder.data.network.tcp.TcpConnectionManager
+import com.wayfinder.wayfinder.presentation.device.DeviceDiscoveryDialog
+import com.wayfinder.wayfinder.presentation.navigation.NavigationFragment
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Main map fragment for route selection and navigation.
+ * 
+ * Flow:
+ * 1. Shows user's current location on map
+ * 2. User searches for destination via autocomplete
+ * 3. User selects travel mode (walk/drive)
+ * 4. Multiple route options displayed with time/distance labels
+ * 5. User selects route and clicks "Start Navigation"
+ * 6. Device discovery bottom sheet opens
+ * 7. User selects Quest device
+ * 8. Route data sent via persistent TCP connection
+ */
 class MapFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
@@ -53,6 +74,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private val routeConverter = RouteConverter()
     private var currentLocationLatLng: LatLng? = null
     private var destinationLatLng: LatLng? = null
+    private var destinationName: String? = null
     private lateinit var directionsButton: ImageButton
     private lateinit var startNavigationButton: ImageButton
     private lateinit var myLocationButton: ImageButton
@@ -60,16 +82,37 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private lateinit var drivingButton: ImageButton
     private lateinit var startServerButton: ImageButton
     private lateinit var navigatePhoneButton: ImageButton
+    
+    // Navigation header views
+    private lateinit var autocompleteContainer: View
+    private lateinit var navigationHeader: View
+    private lateinit var navigationDestinationText: TextView
+    private lateinit var navigationEtaText: TextView
+    private lateinit var navigationConnectionDot: View
+    private lateinit var exitNavigationButton: ImageButton
+    
+    // State
+    private var isInNavigationMode: Boolean = false
+    
     private var polylineToRouteMap: MutableMap<Polyline, Route> = mutableMapOf()
     private var selectedPolyline: Polyline? = null
     private var routeInfoMarkerToRouteMap: MutableMap<Marker, Route> = mutableMapOf()
     private var selectedRouteJson: String? = null
     private var routeConversionCompleted = false
-    private var pendingTransmissionDevice: DeviceInfo? = null
     private var progressDialog: Dialog? = null
+    
+    // Use persistent connection manager instead of legacy TcpClient
+    private val connectionManager by lazy { 
+        TcpConnectionManager.getInstance(requireContext()) 
+    }
+    
+    // Navigation event manager for proper started/ended lifecycle
+    private val navigationEventManager by lazy {
+        com.wayfinder.wayfinder.domain.usecase.NavigationEventManager(connectionManager)
+    }
+
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_map, container, false)
     }
 
@@ -77,13 +120,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         super.onViewCreated(view, savedInstanceState)
         initializeMapFragment()
         setupButtons(view)
+        setupNavigationHeader(view)
         setupAutocompleteFragment()
+        observeConnectionState()
     }
+    
     private fun setupDirectionsButton() {
         directionsButton.setOnClickListener {
-            // Toggle the visibility of walking and driving buttons
             val areButtonsVisible = walkingButton.visibility == View.VISIBLE
-            toggleWalkingDrivingButtons(!areButtonsVisible) // Show if hidden, hide if shown
+            toggleWalkingDrivingButtons(!areButtonsVisible)
         }
     }
 
@@ -118,7 +163,163 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         startServerButton.visibility = View.GONE
         navigatePhoneButton.visibility = View.GONE
     }
+    
+    /**
+     * Initialize navigation header views and exit button.
+     */
+    private fun setupNavigationHeader(view: View) {
+        autocompleteContainer = view.findViewById(R.id.autocomplete_fragment_container)
+        navigationHeader = view.findViewById(R.id.navigation_header)
+        navigationDestinationText = view.findViewById(R.id.navigation_destination_text)
+        navigationEtaText = view.findViewById(R.id.navigation_eta_text)
+        navigationConnectionDot = view.findViewById(R.id.navigation_connection_dot)
+        exitNavigationButton = view.findViewById(R.id.exit_navigation_button)
+        
+        exitNavigationButton.setOnClickListener {
+            exitNavigationMode()
+        }
+    }
+    
+    /**
+     * Reset map to initial state - clears routes, markers, destination.
+     * Called when user clears the search or exits navigation.
+     */
+    private fun resetMapToInitialState() {
+        // Clear map
+        if (::mMap.isInitialized) {
+            mMap.clear()
+        }
+        
+        // Clear route data
+        polylineToRouteMap.clear()
+        routeInfoMarkerToRouteMap.clear()
+        selectedPolyline = null
+        selectedRouteJson = null
+        routeConversionCompleted = false
+        destinationLatLng = null
+        destinationName = null
+        
+        // Reset UI to initial state
+        myLocationButton.visibility = View.VISIBLE
+        directionsButton.visibility = View.GONE
+        walkingButton.visibility = View.GONE
+        drivingButton.visibility = View.GONE
+        startNavigationButton.visibility = View.GONE
+        startServerButton.visibility = View.GONE
+        navigatePhoneButton.visibility = View.GONE
+        
+        // Show search bar, hide navigation header
+        autocompleteContainer.visibility = View.VISIBLE
+        navigationHeader.visibility = View.GONE
+        isInNavigationMode = false
+        
+        // Move to current location
+        moveToCurrentLocation()
+        
+        Log.d("MapFragment", "Map reset to initial state")
+    }
+    
+    /**
+     * Enter navigation mode - hide search bar, show navigation header.
+     */
+    private fun enterNavigationMode(destination: String, eta: String) {
+        isInNavigationMode = true
+        
+        // Hide search bar, show navigation header
+        autocompleteContainer.visibility = View.GONE
+        navigationHeader.visibility = View.VISIBLE
+        
+        // Update navigation header
+        navigationDestinationText.text = destination
+        navigationEtaText.text = "ETA: $eta"
+        
+        // Hide all route selection buttons
+        directionsButton.visibility = View.GONE
+        walkingButton.visibility = View.GONE
+        drivingButton.visibility = View.GONE
+        startNavigationButton.visibility = View.GONE
+        startServerButton.visibility = View.GONE
+        navigatePhoneButton.visibility = View.GONE
+        myLocationButton.visibility = View.GONE  // Hide during navigation
+        
+        Log.d("MapFragment", "Entered navigation mode for: $destination")
+    }
+    
+    /**
+     * Exit navigation mode - end navigation session but KEEP connection.
+     * Returns to route selection state with destination preserved.
+     */
+    private fun exitNavigationMode() {
+        // Send end navigation message to Quest (but stay connected!)
+        if (connectionManager.isConnected()) {
+            navigationEventManager.endNavigation(
+                com.wayfinder.wayfinder.domain.model.NavigationEndReason.USER_CANCELLED.value
+            ) { _, _ -> }
+        }
+        
+        // Exit navigation mode state
+        isInNavigationMode = false
+        
+        // Show search bar with destination preserved, hide navigation header
+        autocompleteContainer.visibility = View.VISIBLE
+        navigationHeader.visibility = View.GONE
+        
+        // Show route selection buttons (user can start new navigation or select different route)
+        if (destinationLatLng != null) {
+            // Destination still set - show directions button
+            myLocationButton.visibility = View.VISIBLE
+            directionsButton.visibility = View.VISIBLE
+            startNavigationButton.visibility = View.GONE
+            startServerButton.visibility = View.GONE
+            navigatePhoneButton.visibility = View.GONE
+            walkingButton.visibility = View.GONE
+            drivingButton.visibility = View.GONE
+        } else {
+            // No destination - show only location button
+            myLocationButton.visibility = View.VISIBLE
+            directionsButton.visibility = View.GONE
+        }
+        
+        Log.d("MapFragment", "Exited navigation mode - connection preserved")
+        Toast.makeText(context, "Navigation ended", Toast.LENGTH_SHORT).show()
+    }
+    
+    /**
+     * Observe connection state for UI updates.
+     */
+    private fun observeConnectionState() {
+        connectionManager.connectionState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is ConnectionState.Connected -> {
+                    dismissDataTransmissionProgressDialog()
+                    // Don't show toast - status card shows connection state
+                    // Update navigation header connection dot
+                    if (isInNavigationMode) {
+                        navigationConnectionDot.setBackgroundResource(R.drawable.connection_indicator_connected)
+                    }
+                }
+                is ConnectionState.Failed -> {
+                    dismissDataTransmissionProgressDialog()
+                    // Don't show toast - status card already shows the error
+                    // Optionally update navigation header
+                    if (isInNavigationMode) {
+                        navigationConnectionDot.setBackgroundResource(R.drawable.connection_indicator_disconnected)
+                    }
+                }
+                is ConnectionState.Disconnected -> {
+                    // Update navigation header connection dot
+                    if (isInNavigationMode) {
+                        navigationConnectionDot.setBackgroundResource(R.drawable.connection_indicator_disconnected)
+                    }
+                }
+                else -> { /* Ignore other states in MapFragment */ }
+            }
+        }
+    }
 
+    /**
+     * Show device discovery dialog and convert route for transmission.
+     */
     private fun showDeviceDiscoveryAndConvertRoute() {
         if (selectedRouteJson.isNullOrEmpty()) {
             Toast.makeText(context, "Please select a route first.", Toast.LENGTH_SHORT).show()
@@ -126,38 +327,33 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         lifecycleScope.launch {
-            val deviceDiscoveryTask = async { startDeviceDiscovery() }
-            val routeConversionTask = async { convertRoute() }
-
-            // Await both tasks to ensure both operations are complete before proceeding
-            deviceDiscoveryTask.await()
-            routeConversionTask.await()
-
-            // Now check if there's a pending device and if route conversion is completed
-            if (routeConversionCompleted && pendingTransmissionDevice != null) {
-                transmitDataToDevice(pendingTransmissionDevice!!)
-                pendingTransmissionDevice = null // Clear the pending device
-            }
-        }
-    }
-
-    private suspend fun startDeviceDiscovery() {
-        val deviceDiscoveryDialog = DeviceDiscoveryDialog { deviceInfo ->
-            // Assume this callback is triggered when a device is selected from the dialog
-            if (routeConversionCompleted) {
-                transmitDataToDevice(deviceInfo)
+            // Convert route in background
+            val conversionTask = async { convertRoute() }
+            
+            // Skip device discovery if already connected - just transmit directly
+            if (connectionManager.isConnected()) {
+                conversionTask.await()
+                transmitRouteData()
             } else {
-                pendingTransmissionDevice = deviceInfo
+                // Show device discovery dialog
+                val deviceDiscoveryDialog = DeviceDiscoveryDialog.newInstance()
+                
+                // Set callback to auto-transmit route after connection succeeds
+                deviceDiscoveryDialog.setOnConnectedListener {
+                    // This is called just before dialog dismisses
+                    // Transmit route data automatically
+                    lifecycleScope.launch {
+                        conversionTask.await()
+                        transmitRouteData()
+                    }
+                }
+                
+                deviceDiscoveryDialog.show(childFragmentManager, "DeviceDiscovery")
+                
+                // Wait for route conversion in parallel
+                conversionTask.await()
             }
         }
-        deviceDiscoveryDialog.show(childFragmentManager, deviceDiscoveryDialog.tag)
-
-        // Start UDP Discovery
-        UdpDiscovery { deviceInfo ->
-            activity?.runOnUiThread {
-                deviceDiscoveryDialog.addDevice(deviceInfo)
-            }
-        }.startDiscovery()
     }
 
     private suspend fun convertRoute() {
@@ -167,59 +363,108 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                     val customLatLng = toCustomLatLng(currentLocation)
                     routeConverter.convertJsonRouteToUnityCoords(json, customLatLng)
                     routeConversionCompleted = true
-                    checkAndTransmitPendingData()
+                    Log.d("MapFragment", "Route conversion completed")
                 }
             } catch (e: Exception) {
                 Log.e("MapFragment", "Route conversion failed: ${e.message}")
                 routeConversionCompleted = false
-                Toast.makeText(context, "Route conversion failed. Please try again.", Toast.LENGTH_LONG).show()
-            }
-        } ?: run {
-            Log.e("MapFragment", "No route selected for conversion.")
-            Toast.makeText(context, "No route selected. Please select a route and try again.", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun checkAndTransmitPendingData() {
-        pendingTransmissionDevice?.let {
-            transmitDataToDevice(it)
-            pendingTransmissionDevice = null
-        }
-    }
-    private fun transmitDataToDevice(deviceInfo: DeviceInfo) {
-        routeConverter.lastConvertedRoute?.let { unityCoords ->
-            val dataToSend = Gson().toJson(unityCoords)
-            val tcpClient = TcpClient()
-
-            activity?.runOnUiThread {
-                showDataTransmissionProgressDialog()
-                Toast.makeText(context, "Sending navigation data...", Toast.LENGTH_SHORT).show()
-            }
-
-            tcpClient.sendData(deviceInfo.ipAddress, Constants.TCP_PORT, dataToSend, deviceInfo.deviceName) { isSuccess, message ->
-                activity?.runOnUiThread {
-                    dismissDataTransmissionProgressDialog()
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Route conversion failed. Please try again.", Toast.LENGTH_LONG).show()
                 }
             }
         } ?: run {
-            Toast.makeText(context, "No route selected or conversion error.", Toast.LENGTH_SHORT).show()
+            Log.e("MapFragment", "No route selected for conversion.")
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "No route selected. Please select a route and try again.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    
+    /**
+     * Public method for MainActivity to trigger route sending.
+     * Called when user clicks the FAB after selecting a route.
+     */
+    fun sendRouteToQuest() {
+        if (!connectionManager.isConnected()) {
+            Toast.makeText(context, "Not connected to Quest. Please connect first.", Toast.LENGTH_SHORT).show()
+            showDeviceDiscoveryAndConvertRoute()
+            return
+        }
+        
+        // Ensure route is converted
+        if (!routeConversionCompleted) {
+            lifecycleScope.launch {
+                convertRoute()
+                transmitRouteData()
+            }
+        } else {
+            transmitRouteData()
+        }
+    }
+    
+    /**
+     * Transmit converted route data to connected Quest device.
+     * Uses NavigationEventManager for proper event lifecycle.
+     */
+    private fun transmitRouteData() {
+        // RouteConverter.lastConvertedRoute returns List<wayfinder.UnityCoord>
+        routeConverter.lastConvertedRoute?.let { unityCoordList ->
+            // Convert from wayfinder.UnityCoord to domain.model.UnityCoord
+            val waypoints = unityCoordList.map { coord ->
+                com.wayfinder.wayfinder.domain.model.UnityCoord(coord.x, coord.z)
+            }
+            
+            // Create metadata from route info
+            var etaString = "--"
+            val metadata = selectedRouteJson?.let { json ->
+                try {
+                    val route = Gson().fromJson(json, Route::class.java)
+                    val totalMeters = route.legs.sumOf { it.distance.value }.toFloat()
+                    val totalSeconds = route.legs.sumOf { it.duration.value }
+                    
+                    // Calculate ETA string
+                    val hours = totalSeconds / 3600
+                    val minutes = (totalSeconds % 3600) / 60
+                    etaString = if (hours > 0) "${hours}h ${minutes}min" else "${minutes} min"
+                    
+                    com.wayfinder.wayfinder.domain.model.RouteMetadata(
+                        distanceRemainingMeters = totalMeters,
+                        etaSeconds = totalSeconds
+                    )
+                } catch (e: Exception) { null }
+            }
+            
+            showDataTransmissionProgressDialog()
+            Toast.makeText(context, "Starting navigation...", Toast.LENGTH_SHORT).show()
+            
+            // Use NavigationEventManager for proper started/ended events
+            navigationEventManager.startNavigation(waypoints, metadata) { isSuccess, message ->
+                activity?.runOnUiThread {
+                    dismissDataTransmissionProgressDialog()
+                    if (isSuccess) {
+                        Toast.makeText(context, "Navigation started!", Toast.LENGTH_SHORT).show()
+                        // Enter navigation mode with destination and ETA
+                        enterNavigationMode(destinationName ?: "Destination", etaString)
+                    } else {
+                        Toast.makeText(context, "Failed: $message", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } ?: run {
+            Toast.makeText(context, "No route data available. Please select a route.", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun startPhoneNavigation() {
-        // Create a new instance of NavigationFragment, passing the selected route JSON via fragment arguments
         val navigationFragment = NavigationFragment().apply {
             arguments = Bundle().apply {
                 putString("selectedRouteJson", selectedRouteJson)
             }
         }
 
-        // Replace the current fragment with NavigationFragment
-        // Ensure the container ID matches your layout's
         activity?.supportFragmentManager?.beginTransaction()
             ?.replace(R.id.fragment_container, navigationFragment)
-            ?.addToBackStack(null) // Optional: Add transaction to the back stack for user navigation
+            ?.addToBackStack(null)
             ?.commit()
     }
 
@@ -278,8 +523,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private fun moveToCurrentLocation() {
         if (ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fetchLocationAndDisplay()
-        } else {
-            // Reminder: Handle permission request as needed.
         }
     }
 
@@ -304,7 +547,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             val lastLocation = locationService.getLastLocation()
             lastLocation?.let {
                 val currentLatLng = LatLng(it.latitude, it.longitude)
-                currentLocationLatLng = currentLatLng // Store the current location
+                currentLocationLatLng = currentLatLng
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
             } ?: Log.d("MapFragment", "Last location is null")
         }
@@ -314,20 +557,33 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private fun setupAutocompleteFragment() {
         val autocompleteFragment = childFragmentManager.findFragmentById(R.id.autocomplete_fragment) as AutocompleteSupportFragment
         autocompleteFragment.setPlaceFields(listOf(Place.Field.ID, Place.Field.NAME, Place.Field.LAT_LNG))
+        
+        // Set listener for clear button click (search bar X button)
+        autocompleteFragment.view?.findViewById<View>(
+            com.google.android.libraries.places.R.id.places_autocomplete_clear_button
+        )?.setOnClickListener {
+            autocompleteFragment.setText("")
+            resetMapToInitialState()
+        }
+        
         autocompleteFragment.setOnPlaceSelectedListener(object : PlaceSelectionListener {
             override fun onPlaceSelected(place: Place) {
                 destinationLatLng = place.latLng
+                destinationName = place.name // Save for navigation header
                 mMap.clear()
+                polylineToRouteMap.clear()
+                routeInfoMarkerToRouteMap.clear()
+                routeConversionCompleted = false
+                
                 place.latLng?.let {
                     mMap.addMarker(MarkerOptions().position(it).title(place.name))
                     mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
 
-                    // Reset button visibilities for a new search
-                    myLocationButton.visibility = View.VISIBLE // Show my location button
-                    directionsButton.visibility = View.VISIBLE // Show directions button for the new search
-                    startNavigationButton.visibility = View.GONE // Hide start navigation button until needed
-                    walkingButton.visibility = View.GONE // Ensure walking button is hidden
-                    drivingButton.visibility = View.GONE // Ensure driving button is hidden
+                    myLocationButton.visibility = View.VISIBLE
+                    directionsButton.visibility = View.VISIBLE
+                    startNavigationButton.visibility = View.GONE
+                    walkingButton.visibility = View.GONE
+                    drivingButton.visibility = View.GONE
                     startServerButton.visibility = View.GONE
                     navigatePhoneButton.visibility = View.GONE
                 }
@@ -344,9 +600,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             try {
                 val directionsService = DirectionsService(requireContext())
                 val result = directionsService.getDirections(start, end, mode)
-//                Log.d("111111111111111111111111111111",result.toString())
 
-                var isFirstRoute = true // Flag to identify the first (default-selected) route
+                var isFirstRoute = true
 
                 result?.routes?.forEachIndexed { index, route ->
                     val (totalDistance, totalTime) = calculateTotalDistanceAndTime(route)
@@ -364,18 +619,17 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                         .color(ContextCompat.getColor(requireContext(), if (isFirstRoute) R.color.selectedPolylineColor else R.color.unselectedPolylineColor))
                         .width(if (isFirstRoute) SELECTED_POLYLINE_WIDTH else UNSELECTED_POLYLINE_WIDTH)
                         .clickable(true)
-                        .zIndex(if (isFirstRoute) 1f else 0f) // Set zIndex to 1 for the first route to render it on top
+                        .zIndex(if (isFirstRoute) 1f else 0f)
 
                     mMap.addPolyline(shadowPolylineOptions)
                     val polyline = mMap.addPolyline(polylineOptions)
                     polyline.tag = route
 
                     if (isFirstRoute) {
-                        // Log the default-selected route
                         Log.d("SelectedRoute", "Default-selected route: ${Gson().toJson(route)}")
                         selectedPolyline = polyline
                         selectedRouteJson = Gson().toJson(route)
-                        isFirstRoute = false // Reset the flag after the first route
+                        isFirstRoute = false
                     }
 
                     polylineToRouteMap[polyline] = route
@@ -415,7 +669,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun calculateMidpoint(route: Route): LatLng {
         val decodedPath = PolyUtil.decode(route.overview_polyline.points)
-        return decodedPath[decodedPath.size / 2] // Get the midpoint for simplicity
+        return decodedPath[decodedPath.size / 2]
     }
 
     private fun generateCustomMarkerView(distance: String, duration: String, isSelected: Boolean): Bitmap {
@@ -484,11 +738,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         // Keep track of the selected polyline
         selectedPolyline = polyline
 
-        // Log the selected route for debugging
         Log.d("SelectedRoute", "Selected route: ${Gson().toJson(selectedRoute)}")
 
         polylineToRouteMap[polyline]?.let { route ->
             selectedRouteJson = Gson().toJson(route)
+            routeConversionCompleted = false // Reset conversion when route changes
         }
     }
 
@@ -503,17 +757,16 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
         mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100), object : GoogleMap.CancelableCallback {
             override fun onFinish() {
-                deferredCompletion.complete(Unit) // Mark the deferred as complete when animation finishes
+                deferredCompletion.complete(Unit)
             }
 
             override fun onCancel() {
-                deferredCompletion.complete(Unit) // Also complete it in case of cancellation
+                deferredCompletion.complete(Unit)
             }
         })
 
-        deferredCompletion.await() // Await the completion of the camera animation
+        deferredCompletion.await()
 
-        // Ensure UI updates happen on the main thread
         withContext(Dispatchers.Main) {
             hideAllButtonsAndShowStart()
         }
@@ -547,12 +800,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         progressDialog?.dismiss()
     }
 
-    private fun toCustomLatLng(googleLatLng: com.google.android.gms.maps.model.LatLng): com.wayfinder.wayfinderar.RouteConverter.LatLng {
-        return com.wayfinder.wayfinderar.RouteConverter.LatLng(googleLatLng.latitude, googleLatLng.longitude)
+    private fun toCustomLatLng(googleLatLng: com.google.android.gms.maps.model.LatLng): com.wayfinder.wayfinder.data.converter.RouteConverter.LatLng {
+        return com.wayfinder.wayfinder.data.converter.RouteConverter.LatLng(googleLatLng.latitude, googleLatLng.longitude)
     }
 
-    private fun toGoogleLatLng(customLatLng: com.wayfinder.wayfinderar.RouteConverter.LatLng): com.google.android.gms.maps.model.LatLng {
+    private fun toGoogleLatLng(customLatLng: com.wayfinder.wayfinder.data.converter.RouteConverter.LatLng): com.google.android.gms.maps.model.LatLng {
         return com.google.android.gms.maps.model.LatLng(customLatLng.latitude, customLatLng.longitude)
     }
-
 }

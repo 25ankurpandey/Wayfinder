@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.data.location
 
 import android.content.Context
 import android.hardware.Sensor

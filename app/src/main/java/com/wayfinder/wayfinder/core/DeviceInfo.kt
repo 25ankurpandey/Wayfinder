@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.core
 
 data class DeviceInfo(
     val ipAddress: String, // this is a unique identifier for each device

@@ -1,7 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Base colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="selectedPolylineColor">#2196F3</color>
-    <color name="unselectedPolylineColor">#83ABBD</color>
+    
+    <!-- Wayfinder Brand Colors - Matching Quest holographic theme -->
+    <color name="cyan_primary">#00BCD4</color>
+    <color name="cyan_light">#5DDEF4</color>
+    <color name="cyan_dark">#008BA3</color>
+    
+    <color name="magenta_accent">#E040FB</color>
+    <color name="magenta_light">#FF79FF</color>
+    <color name="magenta_dark">#AA00C7</color>
+    
+    <!-- Dark Mode Surface Colors (primary) -->
+    <color name="dark_surface">#121212</color>
+    <color name="dark_surface_elevated">#1E1E1E</color>
+    <color name="dark_surface_container">#252525</color>
+    <color name="dark_surface_container_high">#2D2D2D</color>
+    
+    <!-- Light Mode Surface Colors -->
+    <color name="light_surface">#FAFAFA</color>
+    <color name="light_surface_container">#F0F0F0</color>
+    
+    <!-- Status Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FF9800</color>
+    <color name="error">#F44336</color>
+    
+    <!-- Map Polyline Colors -->
+    <color name="selectedPolylineColor">#00BCD4</color>
+    <color name="unselectedPolylineColor">#4D9E9E9E</color>
+    <color name="activeRouteColor">#E040FB</color>
+    
+    <!-- Navigation Colors -->
+    <color name="nav_indicator_color">#3300BCD4</color>
+    <color name="nav_item_selected">#00BCD4</color>
+    <color name="nav_item_unselected">#9E9E9E</color>
+    
+    <!-- Glassmorphism Effect Colors -->
+    <color name="glass_background">#CC121212</color>
+    <color name="glass_border">#4D00BCD4</color>
+    
+    <!-- Semantic Color Aliases for Material 3 -->
+    <color name="surface_dark">@color/dark_surface</color>
+    <color name="surface_elevated">@color/dark_surface_elevated</color>
+    <color name="surface_container">@color/dark_surface_container</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#B3FFFFFF</color>
+    <color name="accent_cyan">@color/cyan_primary</color>
+    <color name="accent_magenta">@color/magenta_accent</color>
+    <color name="error_red">@color/error</color>
 </resources>

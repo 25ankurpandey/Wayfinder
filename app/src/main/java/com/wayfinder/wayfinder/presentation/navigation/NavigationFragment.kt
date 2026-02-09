@@ -1,4 +1,4 @@
-package com.wayfinder.wayfinder
+package com.wayfinder.wayfinder.presentation.navigation
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -22,9 +22,11 @@ import com.google.android.gms.maps.model.PolylineOptions
 import com.google.gson.Gson
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.SphericalUtil
-import com.wayfinder.wayfinder.MapConstants.SELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinder.R
+import com.wayfinder.wayfinder.core.MapConstants.SELECTED_POLYLINE_WIDTH
+import com.wayfinder.wayfinder.data.api.Route
+import com.wayfinder.wayfinder.data.location.LocationService
 import com.wayfinder.wayfinder.databinding.FragmentNavigationBinding
-import com.wayfinder.wayfinderar.LocationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

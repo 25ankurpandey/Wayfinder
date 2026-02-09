@@ -1,9 +1,86 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Base application theme - Material Design 3 with custom branding -->
     <style name="Base.Theme.Wayfinder" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Primary brand color - Cyan -->
+        <item name="colorPrimary">@color/cyan_primary</item>
+        <item name="colorPrimaryContainer">@color/cyan_dark</item>
+        <item name="colorOnPrimary">@color/black</item>
+        <item name="colorOnPrimaryContainer">@color/white</item>
+        
+        <!-- Secondary brand color - Magenta -->
+        <item name="colorSecondary">@color/magenta_accent</item>
+        <item name="colorSecondaryContainer">@color/magenta_dark</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="colorOnSecondaryContainer">@color/white</item>
+        
+        <!-- Tertiary - Same as secondary for accent -->
+        <item name="colorTertiary">@color/magenta_light</item>
+        
+        <!-- Background/Surface colors -->
+        <item name="android:colorBackground">@color/dark_surface</item>
+        <item name="colorSurface">@color/dark_surface</item>
+        <item name="colorSurfaceVariant">@color/dark_surface_elevated</item>
+        <item name="colorSurfaceContainer">@color/dark_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/dark_surface_container_high</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="colorOnSurfaceVariant">#B0B0B0</item>
+        
+        <!-- Status bar and navigation bar -->
+        <item name="android:statusBarColor">@color/dark_surface</item>
+        <item name="android:navigationBarColor">@color/dark_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- Error colors -->
+        <item name="colorError">@color/error</item>
+        <item name="colorOnError">@color/white</item>
     </style>
 
     <style name="Theme.Wayfinder" parent="Base.Theme.Wayfinder" />
+    
+    <!-- Bottom Navigation Style -->
+    <style name="Theme.Wayfinder.BottomNavigation">
+        <item name="itemIconTint">@color/bottom_nav_color_selector</item>
+        <item name="itemTextColor">@color/bottom_nav_color_selector</item>
+        <item name="itemActiveIndicatorStyle">@style/Theme.Wayfinder.BottomNavIndicator</item>
+    </style>
+    
+    <style name="Theme.Wayfinder.BottomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/nav_indicator_color</item>
+    </style>
+    
+    <!-- Extended FAB Style -->
+    <style name="Theme.Wayfinder.ExtendedFab" parent="Widget.Material3.ExtendedFloatingActionButton.Primary">
+        <item name="backgroundTint">@color/cyan_primary</item>
+        <item name="iconTint">@color/black</item>
+    </style>
+    
+    <!-- Glassmorphism Card Style -->
+    <style name="Theme.Wayfinder.GlassCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/glass_background</item>
+        <item name="cardElevation">8dp</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="strokeColor">@color/glass_border</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+    
+    <!-- Chip Style for Walking/Driving toggle -->
+    <style name="Theme.Wayfinder.Chip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/dark_surface_container</item>
+        <item name="checkedIconVisible">true</item>
+        <item name="checkedIcon">@drawable/ic_check</item>
+        <item name="chipStrokeColor">@color/cyan_primary</item>
+        <item name="chipStrokeWidth">1dp</item>
+    </style>
+    
+    <!-- Dialog Style -->
+    <style name="Theme.Wayfinder.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:background">@color/dark_surface_elevated</item>
+        <item name="colorSurface">@color/dark_surface_elevated</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Theme.Wayfinder.Dialog.PositiveButton</item>
+    </style>
+    
+    <style name="Theme.Wayfinder.Dialog.PositiveButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/cyan_primary</item>
+    </style>
 </resources>

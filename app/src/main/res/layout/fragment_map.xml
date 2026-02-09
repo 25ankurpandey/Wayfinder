@@ -8,6 +8,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
+    <!-- Search Bar Container (hidden during navigation) -->
     <FrameLayout
         android:id="@+id/autocomplete_fragment_container"
         android:layout_width="match_parent"
@@ -24,6 +25,78 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
     </FrameLayout>
+
+    <!-- Navigation Header (shown during active navigation) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/navigation_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/dark_surface_elevated"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp">
+
+            <!-- Close/Exit Navigation Button -->
+            <ImageButton
+                android:id="@+id/exit_navigation_button"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_close"
+                android:contentDescription="Exit Navigation"
+                android:scaleType="centerInside"
+                android:padding="8dp" />
+
+            <!-- Destination Info -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/navigation_destination_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Navigating to..."
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/navigation_eta_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ETA: --"
+                    android:textColor="@color/cyan_primary"
+                    android:textSize="14sp" />
+
+            </LinearLayout>
+
+            <!-- Connection Status Dot -->
+            <View
+                android:id="@+id/navigation_connection_dot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="@drawable/connection_indicator_disconnected" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
 
     <ImageButton
         android:id="@+id/my_location_button"

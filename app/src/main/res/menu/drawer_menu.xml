@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/drawer_settings"
+            android:icon="@drawable/ic_settings"
+            android:title="@string/drawer_settings" />
+        <item
+            android:id="@+id/drawer_help"
+            android:icon="@drawable/ic_help"
+            android:title="@string/drawer_help" />
+    </group>
+    
+    <item android:title="@string/drawer_connection">
+        <menu>
+            <item
+                android:id="@+id/drawer_disconnect"
+                android:icon="@drawable/ic_disconnect"
+                android:title="@string/drawer_disconnect" />
+        </menu>
+    </item>
+    
+    <item android:title="Developer">
+        <menu>
+            <item
+                android:id="@+id/drawer_debug_mode"
+                android:icon="@drawable/ic_settings"
+                android:checkable="true"
+                android:title="Debug Mode" />
+        </menu>
+    </item>
+    
+</menu>
